@@ -85,6 +85,9 @@ const intentHandlers = {
     const mobile = requireMobile(agent, 'TransactionHistory', { 'date-period': datePeriod });
     if (!mobile) return;
 
+    console.log(datePeriod);
+    console.log(datePeriod?.startDate);
+    console.log(datePeriod?.endDate);
     if (!datePeriod?.startDate || !datePeriod?.endDate) {
       respondWith(agent, 'Please provide the date range for the transactions.', null);
       return;
@@ -120,7 +123,7 @@ const intentHandlers = {
     }
   },
 
-  PortfolioValuation: async (agent) => {
+  PortfolioEvalution: async (agent) => {
     const mobile = requireMobile(agent, 'PortfolioValuation');
     if (!mobile) return;
 
