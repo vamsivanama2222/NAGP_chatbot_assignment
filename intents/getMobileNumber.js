@@ -5,12 +5,13 @@ const exploreFunds = require('./exploreFunds');
 const investInFund = require('./investInFund');
 
 module.exports = function getMobileNumber(agent) {
-  const mobile = agent.parameters['mobile']?.replace(/\D/g, '');
+  const rawMobile = agent.parameters['mobile'];
+    const mobile = String(rawMobile).replace(/\D/g, '');
 
-  if (!/^\d{10}$/.test(mobile)) {
-    agent.add("That doesn't look like a valid mobile number. Please enter a 10-digit number.");
-    return;
-  }
+if (!/^\d{10}$/.test(mobile)) {
+  agent.add("That doesn't look like a valid mobile number. Please enter a 10-digit number.");
+  return;
+}
 
   agent.context.set({
     name: 'got_mobile',
