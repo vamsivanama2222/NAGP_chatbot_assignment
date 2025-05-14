@@ -242,7 +242,7 @@ const intentMap = {
 };
 
 // Routes
-app.get('/', (req, res) => res.send('Hello from ABC Mutual Fund Bot!'));
+app.get('/', (req, res) => res.send('Hello from NAGP Test Mutual Fund Bot!'));
 app.post('/webhook', (req, res) => new WebhookClient({ request: req, response: res }).handleRequest(intentMap));
 
 // Start Server
