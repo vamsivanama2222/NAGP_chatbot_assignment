@@ -32,15 +32,21 @@ module.exports = function transactionHistory(agent) {
     return;
   }
 
-  const filtered = userData.transactions;
-
-  let response = `Here are your transactions:\n`;
-  filtered.forEach(tx => {
-    response += `• ${tx.date}: ₹${tx.amount} - ${tx.fund_name}\n`;
+  const startDate = new Date(datePeriod.startDate);
+  const endDate = new Date(datePeriod.endDate);
+  const filtered = userData.transactions.filter(tx => {
+    const txDate = new Date(tx.date);
+    return txDate >= startDate && txDate <= endDate;
   });
-  
-  agent.add(response);
-  agent.add("Would you like to invest more in one of these, explore other funds, or exit?");
-  
-  
+
+  if (filtered.length === 0) {
+    agent.add("No transactions found in the given date range.");
+  } else {
+    let response = `Here are your transactions:\n`;
+    filtered.forEach(tx => {
+      response += `• ${tx.date}: ₹${tx.amount} - ${tx.fund_name}\n`;
+    });
+    agent.add(response);
+    agent.add("Would you like to invest more in one of these, explore other funds, or exit?");
+  }
 };
