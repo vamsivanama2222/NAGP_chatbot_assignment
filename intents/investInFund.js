@@ -16,7 +16,7 @@ module.exports = function investInFund(agent) {
       name: 'ask_mobile',
       lifespan: 2,
       parameters: {
-        resume_intent: 'InvestInFund',
+        resume_intent: 'InvestInMutualFund',
         'fund-name': fundName,
         'amount': amount
       }

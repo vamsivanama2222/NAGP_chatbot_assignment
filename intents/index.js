@@ -1,10 +1,10 @@
 module.exports = {
-    WelcomeIntent: require('./welcome'),
+  WelcomeMessage: require('./welcome'),
     GetMobileNumber: require('./getMobileNumber'),
     TransactionHistory: require('./transactionHistory'),
-    PortfolioValuation: require('./portfolioValuation'),
+    PortfolioEvalution: require('./portfolioValuation'),
     ExploreFunds: require('./exploreFunds'),
-    GetFundDetails: require('./getFundDetails'),
-    InvestInFund: require('./investInFund'),
-    ChangeMobileNumber: require('./changeMobileNumber')
+    FundDetails: require('./getFundDetails'),
+    InvestInMutualFund: require('./investInFund'),
+    SwitchAccount: require('./changeMobileNumber')
   };

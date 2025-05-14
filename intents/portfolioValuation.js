@@ -9,7 +9,7 @@ module.exports = function portfolioValuation(agent) {
     agent.context.set({
       name: 'ask_mobile',
       lifespan: 2,
-      parameters: { resume_intent: 'PortfolioValuation' }
+      parameters: { resume_intent: 'PortfolioEvalution' }
     });
     agent.add("Please share your mobile number to get your portfolio details.");
     return;

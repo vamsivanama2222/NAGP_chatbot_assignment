@@ -26,7 +26,7 @@ module.exports = function getMobileNumber(agent) {
     return transactionHistory(agent);
   }
 
-  if (intentToResume === 'PortfolioValuation') {
+  if (intentToResume === 'PortfolioEvalution') {
     return portfolioValuation(agent);
   }
 
@@ -35,7 +35,7 @@ module.exports = function getMobileNumber(agent) {
     return exploreFunds(agent);
   }
 
-  if (intentToResume === 'InvestInFund') {
+  if (intentToResume === 'InvestInMutualFund') {
     agent.parameters['fund-name'] = askContext.parameters['fund-name'];
     agent.parameters['amount'] = askContext.parameters['amount'];
     return investInFund(agent);
