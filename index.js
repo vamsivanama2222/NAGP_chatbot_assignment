@@ -251,14 +251,14 @@ app.post('/webhook', (req, res) => {
   // ──────────────── INTENT MAP ────────────────
 
   const intentMap = new Map();
-  intentMap.set('WelcomeIntent', welcome);
+  intentMap.set('WelcomeMessage', welcome);
   intentMap.set('GetMobileNumber', getMobileNumber);
   intentMap.set('TransactionHistory', transactionHistory);
-  intentMap.set('PortfolioValuation', portfolioValuation);
+  intentMap.set('PortfolioEvalution', portfolioValuation);
   intentMap.set('ExploreFunds', exploreFunds);
-  intentMap.set('GetFundDetails', getFundDetails);
-  intentMap.set('InvestInFund', investInFund);
-  intentMap.set('ChangeMobileNumber', changeMobileNumber);
+  intentMap.set('FundDetails', getFundDetails);
+  intentMap.set('InvestInMutualFund', investInFund);
+  intentMap.set('SwitchAccount', changeMobileNumber);
 
   agent.handleRequest(intentMap);
 });
