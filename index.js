@@ -52,7 +52,7 @@ const intentHandlers = {
   WelcomeMessage: (agent) => {
     respondWith(
       agent,
-      'Hi, welcome to ABC Mutual Fund Services. What service would you like to use?\nQuick Suggestions:\n- Portfolio Valuation\n- Explore Funds\n- Transaction History',
+      'Hi, welcome to CARING Mutual Fund Services. What service would you like to use ? \n - Portfolio Valuation \n - Explore Funds \n - Transaction History',
       null
     );
   },
@@ -63,33 +63,19 @@ const intentHandlers = {
       respondWith(agent, 'Please enter a valid 10-digit mobile number.', null);
       return;
     }
-
     agent.context.set({
       name: 'got_mobile',
       lifespan: 5,
       parameters: { mobile }
     });
-
-    const askContext = agent.context.get('ask_mobile_number');
-    const intentToResume = askContext?.parameters?.resume_intent;
-    if (intentToResume) {
-      Object.assign(agent.parameters, askContext.parameters);
-      return intentHandlers[intentToResume](agent);
-    }
-
-    respondWith(agent, `Thanks! Mobile number saved: ${mobile}.`);
   },
 
   TransactionHistory: async (agent) => {
     const datePeriod = agent.parameters['date-period'];
     const mobile = requireMobile(agent, 'TransactionHistory', { 'date-period': datePeriod });
     if (!mobile) return;
-
-    console.log(datePeriod);
-    console.log(datePeriod?.startDate);
-    console.log(datePeriod?.endDate);
     if (!datePeriod?.startDate || !datePeriod?.endDate) {
-      respondWith(agent, 'Please provide the date range for the transactions.', null);
+      respondWith(agent, 'Please provide comma(,) Separated Valid date range With format (2025-04-10) ', null);
       return;
     }
 
@@ -104,7 +90,7 @@ const intentHandlers = {
       const startDate = new Date(datePeriod.startDate);
       const endDate = new Date(datePeriod.endDate);
       const filtered = userData.transactions.filter(tx => {
-        const txDate = new Date(tx.date);
+      const txDate = new Date(tx.date);
         return txDate >= startDate && txDate <= endDate;
       });
 
@@ -124,7 +110,7 @@ const intentHandlers = {
   },
 
   PortfolioEvalution: async (agent) => {
-    const mobile = requireMobile(agent, 'PortfolioValuation');
+    const mobile = requireMobile(agent, 'PortfolioEvalution');
     if (!mobile) return;
 
     try {
