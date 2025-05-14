@@ -1,266 +1,252 @@
-const fs = require('fs');
-const path = require('path');
 const express = require('express');
 const bodyParser = require('body-parser');
 const { WebhookClient } = require('dialogflow-fulfillment');
+const fs = require('fs').promises;
+const path = require('path');
 
-const app = express().use(bodyParser.json());
+// Utility Functions
+const validateMobileNumber = (mobile) => {
+  if (!mobile) return null;
+  const digitsOnly = mobile.replace(/\D/g, '');
+  return /^\d{10}$/.test(digitsOnly) ? digitsOnly : null;
+};
 
-app.get('/', (req, res) => {
-  res.send('Hello from ABC Mutual Fund Bot!');
-});
-
-app.post('/webhook', (req, res) => {
-  const agent = new WebhookClient({ request: req, response: res });
-
-  // ──────────────── INTENT HANDLERS ────────────────
-
-  function welcome(agent) {
-    agent.add("Hi, welcome to ABC Mutual Fund Services. What service would you like to use?");
-    agent.add("Quick Suggestions:\n- Portfolio Valuation\n- Explore Funds\n- Transaction History");
+const dataCache = new Map();
+const readJsonFile = async (filename) => {
+  if (dataCache.has(filename)) return dataCache.get(filename);
+  try {
+    const filePath = path.join(__dirname, filename);
+    const data = await fs.readFile(filePath, 'utf8');
+    const parsed = JSON.parse(data);
+    dataCache.set(filename, parsed);
+    return parsed;
+  } catch (error) {
+    throw new Error(`Failed to read ${filename}: ${error.message}`);
   }
+};
 
-  function getMobileNumber(agent) {
-    const mobile = agent.parameters['mobile'];
-    const digitsOnly = mobile.replace(/\D/g, '');
-  
-    // ✅ Check if it's a valid 10-digit number
-    if (!/^\d{10}$/.test(digitsOnly)) {
-      agent.add("That doesn't look like a valid mobile number. Please enter a 10-digit number.");
+// Common Response Helper
+const respondWith = (agent, message, followUp = 'What would you like to do next? (e.g., portfolio, transactions, explore funds, exit)') => {
+  agent.add(message);
+  if (followUp) agent.add(followUp);
+};
+
+// Mobile Number Middleware
+const requireMobile = (agent, resumeIntent, extraParams = {}) => {
+  const mobile = validateMobileNumber(agent.context.get('got_mobile')?.parameters?.mobile);
+  if (!mobile) {
+    agent.context.set({
+      name: 'ask_mobile_number',
+      lifespan: 2,
+      parameters: { resume_intent: resumeIntent, ...extraParams }
+    });
+    respondWith(agent, 'Please share your mobile number to continue.', null);
+    return false;
+  }
+  return mobile;
+};
+
+// Intent Handlers
+const intentHandlers = {
+  WelcomeMessage: (agent) => {
+    respondWith(
+      agent,
+      'Hi, welcome to ABC Mutual Fund Services. What service would you like to use?\nQuick Suggestions:\n- Portfolio Valuation\n- Explore Funds\n- Transaction History',
+      null
+    );
+  },
+
+  GetMobileNumber: (agent) => {
+    const mobile = validateMobileNumber(agent.parameters['mobile']);
+    if (!mobile) {
+      respondWith(agent, 'Please enter a valid 10-digit mobile number.', null);
       return;
     }
-  
-    // ✅ Set context for future intents
+
     agent.context.set({
       name: 'got_mobile',
       lifespan: 5,
-      parameters: { mobile: digitsOnly }
+      parameters: { mobile }
     });
-  
-    const askContext = agent.context.get('ask_mobile');
+
+    const askContext = agent.context.get('ask_mobile_number');
     const intentToResume = askContext?.parameters?.resume_intent;
-    const datePeriod = askContext?.parameters?.['date-period'];
-  
-    if (intentToResume === 'TransactionHistory' && datePeriod?.startDate) {
-      agent.parameters['date-period'] = datePeriod;
-      return transactionHistory(agent);
+    if (intentToResume) {
+      Object.assign(agent.parameters, askContext.parameters);
+      return intentHandlers[intentToResume](agent);
     }
-  
-    if (intentToResume === 'PortfolioValuation') {
-      return portfolioValuation(agent);
-    }
-  
-    if (intentToResume === 'ExploreFunds') {
-      agent.parameters['fund-category'] = askContext?.parameters?.fund_category;
-      return exploreFunds(agent);
-    }
-  
-    if (intentToResume === 'InvestInFund') {
-      agent.parameters['fund-name'] = askContext?.parameters?.['fund-name'];
-      agent.parameters['amount'] = askContext?.parameters?.['amount'];
-      return investInFund(agent);
-    }
-  
-    agent.add(`Thanks! I've saved your number: ${digitsOnly}. How can I help you next?`);
-  }
-  
-  
-  
-  function transactionHistory(agent) {
+
+    respondWith(agent, `Thanks! Mobile number saved: ${mobile}.`);
+  },
+
+  TransactionHistory: async (agent) => {
     const datePeriod = agent.parameters['date-period'];
-    const userMobile = agent.context.get('got_mobile')?.parameters?.mobile?.replace(/\D/g, '');
-  
-    if (!userMobile) {
-      agent.context.set({
-        name: 'ask_mobile',
-        lifespan: 2,
-        parameters: {
-          resume_intent: 'TransactionHistory',
-          'date-period': datePeriod
-        }
-      });
-      agent.add("Could you please share your mobile number to continue?");
-      return;
-    }
-  
+    const mobile = requireMobile(agent, 'TransactionHistory', { 'date-period': datePeriod });
+    if (!mobile) return;
+
     if (!datePeriod?.startDate || !datePeriod?.endDate) {
-      agent.add("Please provide the date range for the transactions.");
+      respondWith(agent, 'Please provide the date range for the transactions.', null);
       return;
     }
-  
-    const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'transactionhistorysample.json')));
-    const userData = data.find(u => u.mobile === userMobile);
-  
-    if (!userData) {
-      agent.add("No account found for this mobile number.");
-      return;
-    }
-  
-    const startDate = new Date(datePeriod.startDate);
-    const endDate = new Date(datePeriod.endDate);
-    const filtered = userData.transactions.filter(tx => {
-      const txDate = new Date(tx.date);
-      return txDate >= startDate && txDate <= endDate;
-    });
-  
-    if (filtered.length === 0) {
-      agent.add("No transactions found in the given date range.");
-    } else {
-      let response = `Here are your transactions:\n`;
-      filtered.forEach(tx => {
-        response += `• ${tx.date}: ₹${tx.amount} - ${tx.fund_name}\n`;
-      });
-      agent.add(response);
-      agent.add("Would you like to invest more in one of these, explore other funds, or exit?");
-    }
-  }
-  
 
-  function portfolioValuation(agent) {
-    const userMobile = agent.context.get('got_mobile')?.parameters?.mobile?.replace(/\D/g, '');
-  
-    if (!userMobile) {
-      agent.context.set({
-        name: 'ask_mobile',
-        lifespan: 2,
-        parameters: { resume_intent: 'PortfolioValuation' }
-      });
-      agent.add("Please share your mobile number to get your portfolio details.");
-      return;
-    }
-  
-    const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'transactionhistorysample.json')));
-    const userData = data.find(u => u.mobile === userMobile);
-  
-    if (!userData) {
-      agent.add("No account found for your mobile number.");
-      return;
-    }
-  
-    const total = userData.transactions.reduce((sum, tx) => sum + tx.amount, 0);
-    agent.add(`💼 Your total portfolio valuation is ₹${total}.`);
-    agent.add(`Would you like to explore more funds, check your transaction history, or exit?`);
-  }
-  
+    try {
+      const data = await readJsonFile('transactionhistorysample.json');
+      const userData = data.find(u => u.mobile === mobile);
+      if (!userData) {
+        respondWith(agent, 'No account found for this mobile number.');
+        return;
+      }
 
-  function exploreFunds(agent) {
+      const startDate = new Date(datePeriod.startDate);
+      const endDate = new Date(datePeriod.endDate);
+      const filtered = userData.transactions.filter(tx => {
+        const txDate = new Date(tx.date);
+        return txDate >= startDate && txDate <= endDate;
+      });
+
+      if (filtered.length === 0) {
+        respondWith(agent, 'No transactions found in the given date range.');
+      } else {
+        let response = 'Your transactions:\n';
+        filtered.forEach(tx => {
+          response += `• ${tx.date}: ₹${tx.amount} - ${tx.fund_name}\n`;
+        });
+        respondWith(agent, response);
+      }
+    } catch (error) {
+      console.error('Transaction History Error:', error);
+      respondWith(agent, 'Error retrieving transactions. Please try again.');
+    }
+  },
+
+  PortfolioValuation: async (agent) => {
+    const mobile = requireMobile(agent, 'PortfolioValuation');
+    if (!mobile) return;
+
+    try {
+      const data = await readJsonFile('transactionhistorysample.json');
+      const userData = data.find(u => u.mobile === mobile);
+      if (!userData) {
+        respondWith(agent, 'No account found for your mobile number.');
+        return;
+      }
+
+      const total = userData.transactions.reduce((sum, tx) => sum + tx.amount, 0);
+      respondWith(agent, `💼 Your portfolio valuation: ₹${total}.`);
+    } catch (error) {
+      console.error('Portfolio Valuation Error:', error);
+      respondWith(agent, 'Error retrieving portfolio. Please try again.');
+    }
+  },
+
+  ExploreFunds: async (agent) => {
     const type = agent.parameters['fund-category']?.toLowerCase();
-    const userMobile = agent.context.get('got_mobile')?.parameters?.mobile?.replace(/\D/g, '');
-  
-    if (!userMobile) {
-      agent.context.set({
-        name: 'ask_mobile',
-        lifespan: 2,
-        parameters: {
-          resume_intent: 'ExploreFunds',
-          fund_category: type
-        }
+    const mobile = requireMobile(agent, 'ExploreFunds', { fund_category: type });
+    if (!mobile) return;
+
+    try {
+      const data = await readJsonFile('fund&categorysample.json');
+      const match = data.find(f => f.category.toLowerCase() === type);
+      if (!match) {
+        respondWith(agent, `No details found for category "${type}". Try another category.`);
+        return;
+      }
+
+      let response = `Available ${type} funds:\n`;
+      match.funds.forEach(f => {
+        response += `• ${f.fund_name} (ID: ${f.fund_id})\n`;
       });
-      agent.add("Please share your mobile number before we explore funds.");
-      return;
+      respondWith(agent, response, 'Want details on any fund or to invest?');
+    } catch (error) {
+      console.error('Explore Funds Error:', error);
+      respondWith(agent, 'Error retrieving funds. Please try again.');
     }
-  
-    const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'fund&categorysample.json')));
-    const match = data.find(f => f.category.toLowerCase() === type);
-  
-    if (!match) {
-        agent.add(`Sorry, I couldn’t find details for "${fundName}". You can try another name or explore available funds first.`);
-      return;
+  },
+
+  FundDetails: async (agent) => {
+    const fundName = agent.parameters['fund-name']?.toLowerCase();
+    try {
+      const data = await readJsonFile('fund_details.json');
+      const fund = data.find(f => f.fund_name.toLowerCase() === fundName);
+      if (!fund) {
+        respondWith(agent, `No details found for fund: ${fundName}`);
+        return;
+      }
+
+      let response = `📊 *${fund.fund_name}* Breakdown:\n`;
+      for (const [k, v] of Object.entries(fund.breakdown)) {
+        response += `• ${k}: ${v}%\n`;
+      }
+      response += `\n🔗 More info: ${fund.details_link}`;
+      respondWith(agent, response);
+    } catch (error) {
+      console.error('Fund Details Error:', error);
+      respondWith(agent, 'Error retrieving fund details. Please try again.');
     }
-  
-    let response = `Here are some ${type} funds:\n`;
-    match.funds.forEach(f => {
-      response += `• ${f.fund_name} (ID: ${f.fund_id})\n`;
+  },
+
+  InvestInFund: async (agent) => {
+    const mobile = requireMobile(agent, 'InvestInFund', {
+      'fund-name': agent.parameters['fund-name'],
+      amount: agent.parameters['amount']
     });
-  
-    agent.add(response);
-    agent.add("Would you like details on any of these, or would you like to invest?");
-  }
-  
+    if (!mobile) return;
 
-  function getFundDetails(agent) {
-    const fundName = agent.parameters['fund-name'];
-    const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'fund_details.json')));
-    const fund = data.find(f => f.fund_name.toLowerCase() === fundName?.toLowerCase());
-
-    if (!fund) {
-      agent.add(`No details found for fund: ${fundName}`);
-      return;
-    }
-
-    let response = `📊 *${fund.fund_name}* Breakdown:\n`;
-    for (const [k, v] of Object.entries(fund.breakdown)) {
-      response += `• ${k}: ${v}%\n`;
-    }
-    response += `\n🔗 More info: ${fund.details_link}`;
-    agent.add(response);
-  }
-
-  function investInFund(agent) {
-    const userMobile = agent.context.get('got_mobile')?.parameters?.mobile?.replace(/\D/g, '');
-  
     const amount = agent.parameters['amount'];
     const fundRaw = agent.parameters['fund-name'];
     const fundName = Array.isArray(fundRaw) ? fundRaw[0] : fundRaw;
     const normalizedFund = fundName?.trim()?.toLowerCase();
-  
-    if (!userMobile) {
-      agent.context.set({
-        name: 'ask_mobile',
-        lifespan: 2,
-        parameters: {
-          resume_intent: 'InvestInFund',
-          'fund-name': fundName,
-          'amount': amount
-        }
-      });
-      agent.add("Before we proceed with the investment, please provide your mobile number.");
-      return;
-    }
-  
+
     if (!normalizedFund || !amount) {
-      agent.add("Please mention both the fund name and the amount you'd like to invest.");
+      respondWith(agent, 'Please specify both fund name and investment amount.');
       return;
     }
-  
+
     if (amount > 50000) {
-      agent.add("For demo, investments above ₹50,000 require verification. Contact support.");
+      respondWith(agent, 'Investments above ₹50,000 require verification. Contact support.');
       return;
     }
-  
-    const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'fund_details.json')));
-    const matched = data.find(f => f.fund_name.toLowerCase() === normalizedFund);
-  
-    if (!matched) {
-      agent.add(`Sorry, no fund found with name "${fundName}".`);
-      return;
-    }
-  
-    agent.add(`✅ Successfully simulated an investment of ₹${amount} in ${matched.fund_name}.`);
-    agent.add("Investment successful! Would you like to check your portfolio or explore more funds?");
-    agent.add("Is there anything else you'd like to do? You can say 'portfolio', 'transactions', or 'no' to exit.");
-  }
-  
 
-  function changeMobileNumber(agent) {
+    try {
+      const data = await readJsonFile('fund_details.json');
+      const matched = data.find(f => f.fund_name.toLowerCase() === normalizedFund);
+      if (!matched) {
+        respondWith(agent, `No fund found with name "${fundName}".`);
+        return;
+      }
+
+      respondWith(agent, `✅ Invested ₹${amount} in ${matched.fund_name}.`);
+    } catch (error) {
+      console.error('Invest In Fund Error:', error);
+      respondWith(agent, 'Error processing investment. Please try again.');
+    }
+  },
+
+  SwitchAccount: (agent) => {
     agent.context.set({ name: 'got_mobile', lifespan: 0 });
-    agent.context.set({ name: 'ask_mobile', lifespan: 2 });
-    agent.add("Sure, please provide your new mobile number.");
+    agent.context.set({ name: 'ask_mobile_number', lifespan: 2 });
+    respondWith(agent, 'Please provide your new mobile number.', null);
   }
+};
 
-  // ──────────────── INTENT MAP ────────────────
+// Express App Setup
+const app = express();
+app.use(bodyParser.json());
 
-  const intentMap = new Map();
-  intentMap.set('WelcomeMessage', welcome);
-  intentMap.set('GetMobileNumber', getMobileNumber);
-  intentMap.set('TransactionHistory', transactionHistory);
-  intentMap.set('PortfolioEvalution', portfolioValuation);
-  intentMap.set('ExploreFunds', exploreFunds);
-  intentMap.set('FundDetails', getFundDetails);
-  intentMap.set('InvestInMutualFund', investInFund);
-  intentMap.set('SwitchAccount', changeMobileNumber);
-
-  agent.handleRequest(intentMap);
+app.get('/', (req, res) => {
+  res.status(200).send('Hello from Talent Mutual Fund Bot!');
 });
 
-app.listen(3000, () => console.log("🚀 Server is running on port 3000"));
+app.post('/webhook', (req, res) => {
+  const agent = new WebhookClient({ request: req, response: res });
+  //list all handlers
+  const intentMap = new Map(Object.entries(intentHandlers));
+  //Errro handling
+  agent.handleRequest(intentMap).catch(error => {
+    console.error('Webhook Error:', error);
+    respondWith(agent, 'Sorry, something went wrong. Please try again later.', null);
+  });
+});
+
+const PORT = 3000;
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
