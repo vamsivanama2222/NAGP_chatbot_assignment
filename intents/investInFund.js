@@ -13,7 +13,7 @@ module.exports = function investInFund(agent) {
 
   if (!userMobile) {
     agent.context.set({
-      name: 'ask_mobile',
+      name: 'ask_mobile_number',
       lifespan: 2,
       parameters: {
         resume_intent: 'InvestInMutualFund',

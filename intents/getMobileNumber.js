@@ -18,7 +18,7 @@ module.exports = function getMobileNumber(agent) {
     parameters: { mobile }
   });
 
-  const askContext = agent.context.get('ask_mobile');
+  const askContext = agent.context.get('ask_mobile_number');
   const intentToResume = askContext?.parameters?.resume_intent;
 
   if (intentToResume === 'TransactionHistory' && askContext.parameters['date-period']) {

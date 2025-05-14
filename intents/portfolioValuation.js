@@ -6,12 +6,13 @@ module.exports = function portfolioValuation(agent) {
   const userMobile = getMobileFromContext(agent);
 
   if (!userMobile) {
-    agent.add("Please share your mobile number to get your portfolio details.");
     agent.context.set({
-      name: 'ask_mobile',
+      name: 'ask_mobile_number',
       lifespan: 2,
       parameters: { resume_intent: 'PortfolioEvalution' }
     });
+    agent.add("Please share your mobile number to get your portfolio details.");
+    return;
   }
 
   const data = JSON.parse(fs.readFileSync(path.join(__dirname, '../transactionhistorysample.json')));
