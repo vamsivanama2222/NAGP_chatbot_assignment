@@ -6,8 +6,9 @@ const path = require('path');
 
 // Utility Functions
 const validateMobileNumber = (mobile) => {
-  if (!mobile) return null;
-  const digitsOnly = mobile.replace(/\D/g, '');
+  if (mobile == null) return null;
+  const mobileStr = String(mobile); // Convert to string to ensure replace works
+  const digitsOnly = mobileStr.replace(/\D/g, '');
   return /^\d{10}$/.test(digitsOnly) ? digitsOnly : null;
 };
 
