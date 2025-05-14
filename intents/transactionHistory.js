@@ -31,11 +31,16 @@ module.exports = function transactionHistory(agent) {
     agent.add("No account found for this mobile number.");
     return;
   }
-    let response = `Here are your transactions:\n`;
-    filtered.forEach(tx => {
-      response += `• ${tx.date}: ₹${tx.amount} - ${tx.fund_name}\n`;
-    });
-    agent.add(response);
-    agent.add("Would you like to invest more in one of these, explore other funds, or exit?");
+
+  const filtered = userData.transactions;
+
+  let response = `Here are your transactions:\n`;
+  filtered.forEach(tx => {
+    response += `• ${tx.date}: ₹${tx.amount} - ${tx.fund_name}\n`;
+  });
+  
+  agent.add(response);
+  agent.add("Would you like to invest more in one of these, explore other funds, or exit?");
+  
   
 };
