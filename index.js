@@ -4,8 +4,15 @@ import express from 'express';
 import bodyParser from 'body-parser';
 import { WebhookClient } from 'dialogflow-fulfillment';
 
+
 const app = express().use(bodyParser.json());
-const PORT = 3000;
+// Routes
+app.get('/', (req, res) => res.send('Hello from NAGP Test Mutual Fund Bot!'));
+
+
+app.post('/webhook', (req, res) => {
+    const agent = new WebhookClient({ request: req, response: res });
+
 const DATA_FILES = {
   transactions: 'transactionhistorysample.json',
   funds: 'fund&categorysample.json',
@@ -240,15 +247,13 @@ const intentMap = {
   InvestInFund: investInFund,
   ChangeMobileNumber: changeMobileNumber,
 };
-
-// Routes
-app.get('/', (req, res) => res.send('Hello from NAGP Test Mutual Fund Bot!'));
-app.post('/webhook', (req, res) => new WebhookClient({ request: req, response: res }).handleRequest(intentMap));
+    agent.handleRequest(intentMap);
+});
 
 // Start Server
 const startServer = async () => {
   try {
-    app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+    app.listen(3000, () => console.log("🚀 Server is running on port 3000"));
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);
